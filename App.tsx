@@ -5,21 +5,33 @@
  */
 
 import React from 'react';
+import { StatusBar } from 'react-native';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import AppNavigator from './src/navigation/AppNavigator';
 import { persistor, store } from './src/redux/store';
-import { ThemeProvider } from './src/theme/ThemeContext';
+import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import ToastComponent from './src/components/common/Toast';
 import useNetwork from './src/hooks/useNetwork';
 import ErrorBoundary from './src/components/common/ErrorBoundary';
 
 const Bootstrap = () => {
   useNetwork();
-  return <AppNavigator />;
+  const { isDarkMode, theme } = useTheme();
+
+  return (
+    <>
+      <StatusBar
+        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+        backgroundColor={theme.colors.background}
+        translucent={false}
+      />
+      <AppNavigator />
+    </>
+  );
 };
 
-const App = (): JSX.Element => {
+const App = () => {
   return (
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>

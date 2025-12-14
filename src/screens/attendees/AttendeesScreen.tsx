@@ -4,10 +4,11 @@
  * Responsibility: Support online/offline check-ins with syncing queue.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { RefreshControl, StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
-import { RouteProp, useRoute } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import Toast from 'react-native-toast-message';
 import { ms } from 'react-native-size-matters';
 import AttendeeCard from '../../components/attendee/AttendeeCard';
@@ -16,6 +17,7 @@ import ESearchInput from '../../components/common/ESearchInput';
 import EText from '../../components/common/EText';
 import Skeleton from '../../components/common/Skeleton';
 import {
+  addCheckinImmediately,
   addPendingCheckin,
   checkInAttendeeRemote,
   fetchAttendees,
@@ -30,8 +32,11 @@ import { RootStackParamList } from '../../navigation/types';
 
 const ESTIMATED_ITEM_SIZE = 96;
 
+const ItemSeparator = () => <View style={{ height: ms(4) }} />;
+
 const AttendeesScreen: React.FC = () => {
   const { theme } = useTheme();
+  const navigation = useNavigation();
   const {
     params: { eventId },
   } = useRoute<RouteProp<RootStackParamList, 'Attendees'>>();
@@ -41,9 +46,38 @@ const AttendeesScreen: React.FC = () => {
     (state) => state.attendees,
   );
   const { isConnected } = useAppSelector((state) => state.network);
+  const [localLoading, setLocalLoading] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [search, setSearch] = useState('');
+
+  // Manage local loading state with minimum 3 second display
+  useEffect(() => {
+    if (loading) {
+      // When Redux loading starts, immediately show skeleton
+      setLocalLoading(true);
+      // Clear any existing timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    } else {
+      // When Redux loading ends, wait 3 seconds before hiding skeleton
+      timeoutRef.current = setTimeout(() => {
+        setLocalLoading(false);
+        timeoutRef.current = null;
+      }, 2000);
+    }
+
+    // Cleanup timeout on unmount
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, [loading]);
 
   useEffect(() => {
     dispatch(fetchAttendees(eventId));
@@ -86,6 +120,10 @@ const AttendeesScreen: React.FC = () => {
     [checkins, eventId, pendingCheckins],
   );
 
+  const handleBackPress = useCallback(() => {
+    navigation.goBack();
+  }, [navigation]);
+
   const onRefresh = useCallback(() => {
     dispatch(fetchAttendees(eventId));
     dispatch(fetchCheckins(eventId));
@@ -104,6 +142,8 @@ const AttendeesScreen: React.FC = () => {
 
       if (!isConnected) {
         dispatch(addPendingCheckin(payload));
+        // Also add to state immediately for instant UI update
+        dispatch(addCheckinImmediately(payload));
         Toast.show({
           type: 'info',
           text1: t('offline.status'),
@@ -112,15 +152,20 @@ const AttendeesScreen: React.FC = () => {
         return;
       }
 
+      // Optimistically update UI immediately
+      dispatch(addCheckinImmediately(payload));
+
       try {
         await dispatch(
           checkInAttendeeRemote({ attendeeId: payload.attendeeId, eventId: payload.eventId }),
         ).unwrap();
+        // State is already updated optimistically, API response will confirm/update it
         Toast.show({
           type: 'success',
           text1: t('attendees.checkedIn'),
         });
       } catch {
+        // On error, the optimistic update stays but marked as pending
         dispatch(addPendingCheckin({ ...payload, synced: false }));
         Toast.show({
           type: 'error',
@@ -139,23 +184,106 @@ const AttendeesScreen: React.FC = () => {
     [getStatus, handleCheckIn],
   );
 
-  const keyExtractor = useCallback((item: any) => `${item.id}`, []);
+  const renderSkeletonItem = useCallback(
+    ({ index }: { item: Attendee | null; index: number }) => (
+      <View style={styles.skeletonCard}>
+        {/* Name */}
+        <Skeleton
+          isLoading
+          containerStyle={styles.skeletonNameContainer}
+          layout={[
+            { key: `name-${index}`, width: '65%', height: ms(18) },
+            { key: `company-${index}`, width: '50%', height: ms(14), marginTop: ms(4) },
+          ]}
+        />
+        {/* Email */}
+        <Skeleton
+          isLoading
+          containerStyle={styles.skeletonEmail}
+          layout={[{ key: `email-${index}`, width: '80%', height: ms(14) }]}
+        />
+        {/* Footer: Status + Button */}
+        <View style={styles.skeletonFooter}>
+          <View style={styles.skeletonStatusRow}>
+            <Skeleton
+              isLoading
+              containerStyle={styles.skeletonIcon}
+              layout={[{ key: `icon-${index}`, width: ms(18), height: ms(18) }]}
+            />
+            <Skeleton
+              isLoading
+              containerStyle={styles.skeletonStatus}
+              layout={[{ key: `status-${index}`, width: ms(100), height: ms(14) }]}
+            />
+          </View>
+        </View>
+      </View>
+    ),
+    [styles],
+  );
+
+  const renderItemWithSkeleton = useCallback(
+    ({ item, index }: { item: Attendee | null; index: number }) => {
+      if (localLoading && attendees.length > 0 && item === null) {
+        return renderSkeletonItem({ item, index });
+      }
+      if (item) {
+        return renderItem({ item });
+      }
+      return null;
+    },
+    [localLoading, attendees.length, renderSkeletonItem, renderItem],
+  );
+
+  const keyExtractor = useCallback((item: Attendee | null, index: number): string => {
+    if (item === null) {
+      return `skeleton-${index}`;
+    }
+    return `${item.id}`;
+  }, []);
 
   const ListEmptyComponent = useCallback(() => {
-    if (loading) {
+    if (localLoading) {
       return (
         <View style={styles.skeletonContainer}>
           {[0, 1, 2, 3].map((key) => (
-            <Skeleton
-              key={key}
-              isLoading
-              containerStyle={styles.skeleton}
-              layout={[
-                { key: `name-${key}`, width: '50%', height: 18, marginBottom: 8 },
-                { key: `email-${key}`, width: '70%', height: 14, marginBottom: 6 },
-                { key: `status-${key}`, width: '40%', height: 14 },
-              ]}
-            />
+            <View key={key} style={styles.skeletonCard}>
+              {/* Name */}
+              <Skeleton
+                isLoading
+                containerStyle={styles.skeletonNameContainer}
+                layout={[
+                  { key: `name-empty-${key}`, width: '65%', height: ms(18) },
+                  { key: `company-empty-${key}`, width: '50%', height: ms(14), marginTop: ms(4) },
+                ]}
+              />
+              {/* Email */}
+              <Skeleton
+                isLoading
+                containerStyle={styles.skeletonEmail}
+                layout={[{ key: `email-empty-${key}`, width: '80%', height: ms(14) }]}
+              />
+              {/* Footer: Status + Button */}
+              <View style={styles.skeletonFooter}>
+                <View style={styles.skeletonStatusRow}>
+                  <Skeleton
+                    isLoading
+                    containerStyle={styles.skeletonIcon}
+                    layout={[{ key: `icon-empty-${key}`, width: ms(18), height: ms(18) }]}
+                  />
+                  <Skeleton
+                    isLoading
+                    containerStyle={styles.skeletonStatus}
+                    layout={[{ key: `status-empty-${key}`, width: ms(100), height: ms(14) }]}
+                  />
+                </View>
+                <Skeleton
+                  isLoading
+                  containerStyle={styles.skeletonButton}
+                  layout={[{ key: `button-empty-${key}`, width: ms(90), height: ms(36) }]}
+                />
+              </View>
+            </View>
           ))}
         </View>
       );
@@ -167,30 +295,44 @@ const AttendeesScreen: React.FC = () => {
         </EText>
       </View>
     );
-  }, [loading, styles.emptyState, styles.skeleton, styles.skeletonContainer, theme.typography.textInputSecondary]);
+  }, [localLoading, styles, theme.typography.textInputSecondary]);
+
+  // Show skeleton items when refreshing (localLoading and attendees exist)
+  const displayData: (Attendee | null)[] = localLoading && attendees.length > 0 ? Array(3).fill(null) : filteredAttendees;
 
   return (
     <ESafeAreaWrapper>
       <View style={styles.container}>
+        {/* Header with back arrow */}
         <View style={styles.header}>
-          <EText type="S22">{t('attendees.title')}</EText>
+          <TouchableOpacity onPress={handleBackPress} style={styles.backButton} activeOpacity={0.7}>
+            <Ionicons name="arrow-back" size={ms(24)} color={theme.colors.text} />
+          </TouchableOpacity>
+          <EText type="S20" style={styles.headerTitle}>
+            {t('attendees.title')}
+          </EText>
+          <View style={styles.backButtonPlaceholder} />
+        </View>
+
+        {/* Search Input */}
+        <View style={styles.searchContainer}>
           <ESearchInput
             value={search}
             onChange={setSearch}
             placeholder={t('attendees.searchPlaceholder')}
-            containerStyle={styles.search}
           />
         </View>
 
         <FlashList
-          data={filteredAttendees}
-          renderItem={renderItem}
+          data={displayData}
+          renderItem={renderItemWithSkeleton}
           keyExtractor={keyExtractor}
           estimatedItemSize={ESTIMATED_ITEM_SIZE}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
           ListEmptyComponent={ListEmptyComponent}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          ItemSeparatorComponent={ItemSeparator}
           contentContainerStyle={styles.listContent}
+          extraData={checkins}
         />
       </View>
     </ESafeAreaWrapper>
@@ -202,18 +344,38 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     container: {
       ...flex.flex,
       backgroundColor: theme.colors.background,
-      ...padding.ph16,
-      ...padding.pv12,
     },
     header: {
-      ...gap.g12,
-      ...margin.mb12,
+      ...flex.rowSpaceBetween,
+      ...flex.itemsCenter,
+      ...padding.ph16,
+      ...padding.pv12,
+      backgroundColor: theme.colors.background,
+      borderBottomWidth: ms(1),
+      borderBottomColor: theme.colors.border,
     },
-    search: {
-      ...margin.mt4,
+    backButton: {
+      ...padding.p8,
+      ...margin.mr8,
+    },
+    backButtonPlaceholder: {
+      width: ms(40),
+    },
+    headerTitle: {
+      ...flex.flex,
+      textAlign: 'center',
+    },
+    searchContainer: {
+      ...flex.flexRow,
+      ...padding.ph16,
+      ...padding.pv12,
+      ...margin.mb12,
+      backgroundColor: theme.colors.background,
+      width: '100%',
     },
     listContent: {
       ...padding.pb20,
+      ...padding.ph16,
     },
     separator: {
       height: ms(4),
@@ -227,10 +389,40 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     skeletonContainer: {
       ...gap.g12,
     },
-    skeleton: {
-      ...padding.p16,
+    skeletonCard: {
       backgroundColor: theme.colors.card,
       borderRadius: ms(12),
+      borderWidth: ms(1),
+      borderColor: theme.colors.border,
+      ...padding.p16,
+      overflow: 'hidden',
+    },
+    skeletonNameContainer: {
+      ...margin.mb12,
+    },
+    skeletonEmail: {
+      ...margin.mb12,
+    },
+    skeletonFooter: {
+      ...flex.rowSpaceBetween,
+      ...gap.g12,
+      ...flex.itemsCenter,
+    },
+    skeletonStatusRow: {
+      ...flex.flexRow,
+      ...gap.g6,
+      ...flex.itemsCenter,
+    },
+    skeletonIcon: {
+      ...flex.flex0,
+    },
+    skeletonStatus: {
+      ...flex.flex,
+    },
+    skeletonButton: {
+      ...flex.flex0,
+      borderRadius: ms(8),
+      minHeight: ms(36),
     },
   });
 

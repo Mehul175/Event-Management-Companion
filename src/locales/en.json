@@ -36,11 +36,12 @@
     "error": "Unable to load events",
     "lastUpdated": "Last updated",
     "details": {
+      "title": "Event Details",
       "attendeeCount": "Attendees: {{count}}",
       "location": "Location",
       "startsAt": "Starts at",
       "endsAt": "Ends at",
-      "checkInCta": "Go to check-ins"
+      "checkInCta": "Attendees"
     }
   },
   "attendees": {

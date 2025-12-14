@@ -28,15 +28,17 @@ const AttendeeCard: React.FC<Props> = ({ attendee, status, onCheckIn }) => {
 
   return (
     <View style={styles.card}>
-      <View style={styles.infoRow}>
-        <EText type="S16">{attendee.name}</EText>
+      <View style={styles.nameContainer}>
+        <EText type="S16" style={styles.name}>
+          {attendee.name}
+        </EText>
         {attendee.company && (
-          <EText type="R12" color={theme.typography.textInputSecondary}>
+          <EText type="R12" color={theme.typography.textInputSecondary} style={styles.company}>
             {attendee.company}
           </EText>
         )}
       </View>
-      <EText type="R12" color={theme.typography.textInputSecondary}>
+      <EText type="R12" color={theme.typography.textInputSecondary} style={styles.email}>
         {attendee.email}
       </EText>
 
@@ -94,17 +96,25 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
       borderWidth: ms(1),
       borderColor: theme.colors.border,
       ...padding.p16,
-      ...gap.g8,
+      overflow: 'hidden',
     },
-    infoRow: {
-      ...flex.rowSpaceBetween,
-      ...gap.g8,
+    nameContainer: {
+      ...flex.flex,
+      ...margin.mb12,
+    },
+    name: {
+      ...margin.mb4,
+    },
+    company: {
+      ...margin.mt0,
+    },
+    email: {
+      ...margin.mb12,
     },
     footer: {
       ...flex.rowSpaceBetween,
-      ...gap.g8,
-      ...margin.mt6,
-      alignItems: 'center',
+      ...gap.g12,
+      ...flex.itemsCenter,
     },
     statusRow: {
       ...flex.flexRow,
@@ -114,8 +124,11 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     checkInButton: {
       backgroundColor: theme.colors.primary,
       borderRadius: ms(8),
-      ...padding.pv8,
-      ...padding.ph12,
+      ...padding.pv10,
+      ...padding.ph16,
+      minHeight: ms(36),
+      justifyContent: 'center',
+      alignItems: 'center',
     },
   });
 

@@ -55,13 +55,28 @@ export const checkInAttendeeRemote = createAsyncThunk<Checkin, CheckInPayload>(
 
 const upsertCheckin = (state: AttendeesState, checkin: Checkin) => {
   const list = state.checkinsByEvent[checkin.eventId] || [];
-  const existingIndex = list.findIndex((c) => c.attendeeId === checkin.attendeeId);
+  const existingIndex = list.findIndex(
+    c => c.attendeeId === checkin.attendeeId,
+  );
+
+  let newList: Checkin[];
   if (existingIndex >= 0) {
-    list[existingIndex] = checkin;
+    // Update existing check-in - create new array with updated item
+    newList = [
+      ...list.slice(0, existingIndex),
+      checkin,
+      ...list.slice(existingIndex + 1),
+    ];
   } else {
-    list.push(checkin);
+    // Add new check-in - create new array with new item
+    newList = [...list, checkin];
   }
-  state.checkinsByEvent[checkin.eventId] = list;
+
+  // Create new object reference for checkinsByEvent to ensure proper reactivity
+  state.checkinsByEvent = {
+    ...state.checkinsByEvent,
+    [checkin.eventId]: newList,
+  };
 };
 
 const attendeeSlice = createSlice({
@@ -71,18 +86,29 @@ const attendeeSlice = createSlice({
     addPendingCheckin: (state, action: PayloadAction<Checkin>) => {
       state.pendingCheckins.push(action.payload);
     },
-    markCheckinSynced: (state, action: PayloadAction<{ attendeeId: number; eventId: number }>) => {
+    markCheckinSynced: (
+      state,
+      action: PayloadAction<{ attendeeId: number; eventId: number }>,
+    ) => {
       state.pendingCheckins = state.pendingCheckins.filter(
-        (c) => !(c.attendeeId === action.payload.attendeeId && c.eventId === action.payload.eventId),
+        c =>
+          !(
+            c.attendeeId === action.payload.attendeeId &&
+            c.eventId === action.payload.eventId
+          ),
       );
     },
-    clearAttendeeError: (state) => {
+    addCheckinImmediately: (state, action: PayloadAction<Checkin>) => {
+      // Add check-in to state immediately for instant UI update
+      upsertCheckin(state, action.payload);
+    },
+    clearAttendeeError: state => {
       state.error = undefined;
     },
   },
-  extraReducers: (builder) => {
+  extraReducers: builder => {
     builder
-      .addCase(fetchAttendees.pending, (state) => {
+      .addCase(fetchAttendees.pending, state => {
         state.loading = true;
         state.error = undefined;
       })
@@ -102,7 +128,7 @@ const attendeeSlice = createSlice({
         } else {
           // group by event
           const grouped: Record<number, Checkin[]> = {};
-          action.payload.forEach((c) => {
+          action.payload.forEach(c => {
             if (!grouped[c.eventId]) grouped[c.eventId] = [];
             grouped[c.eventId].push(c);
           });
@@ -112,7 +138,11 @@ const attendeeSlice = createSlice({
       .addCase(checkInAttendeeRemote.fulfilled, (state, action) => {
         upsertCheckin(state, { ...action.payload, synced: true });
         state.pendingCheckins = state.pendingCheckins.filter(
-          (c) => !(c.attendeeId === action.payload.attendeeId && c.eventId === action.payload.eventId),
+          c =>
+            !(
+              c.attendeeId === action.payload.attendeeId &&
+              c.eventId === action.payload.eventId
+            ),
         );
       })
       .addCase(checkInAttendeeRemote.rejected, (state, action) => {
@@ -121,5 +151,10 @@ const attendeeSlice = createSlice({
   },
 });
 
-export const { addPendingCheckin, markCheckinSynced, clearAttendeeError } = attendeeSlice.actions;
+export const {
+  addPendingCheckin,
+  markCheckinSynced,
+  addCheckinImmediately,
+  clearAttendeeError,
+} = attendeeSlice.actions;
 export default attendeeSlice.reducer;

@@ -119,3 +119,4 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
   });
 
 export default React.memo(EventSkeletonCard);
+

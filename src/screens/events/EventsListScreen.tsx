@@ -5,7 +5,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, RefreshControl, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { ms } from 'react-native-size-matters';
@@ -30,7 +30,7 @@ const ESTIMATED_ITEM_SIZE = 140;
 const ItemSeparator = () => <View style={{ height: ms(4) }} />;
 
 const EventsListScreen: React.FC = () => {
-  const { theme } = useTheme();
+  const { theme, isDarkMode, toggleTheme } = useTheme();
   const dispatch = useAppDispatch();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const { logout } = useAuth();
@@ -55,7 +55,7 @@ const EventsListScreen: React.FC = () => {
       timeoutRef.current = setTimeout(() => {
         setLocalLoading(false);
         timeoutRef.current = null;
-      }, 3000);
+      }, 2000);
     }
 
     // Cleanup timeout on unmount
@@ -179,9 +179,26 @@ const EventsListScreen: React.FC = () => {
               {t('common.pullToRefresh')}
             </EText>
           </View>
-          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton} activeOpacity={0.7}>
-            <Ionicons name="log-out-outline" size={ms(24)} color={theme.colors.primary} />
-          </TouchableOpacity>
+          <View style={styles.headerRight}>
+            <View style={styles.darkModeContainer}>
+              <Ionicons
+                name={isDarkMode ? 'moon' : 'sunny-outline'}
+                size={ms(20)}
+                color={theme.colors.textSecondary}
+                style={styles.darkModeIcon}
+              />
+              <Switch
+                value={isDarkMode}
+                onValueChange={toggleTheme}
+                trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
+                thumbColor={theme.colors.card}
+                ios_backgroundColor={theme.colors.border}
+              />
+            </View>
+            <TouchableOpacity onPress={handleLogout} style={styles.logoutButton} activeOpacity={0.7}>
+              <Ionicons name="log-out-outline" size={ms(24)} color={theme.colors.primary} />
+            </TouchableOpacity>
+          </View>
         </View>
         <FlashList
           data={displayData}
@@ -215,6 +232,19 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     headerLeft: {
       ...gap.g4,
       ...flex.flex,
+    },
+    headerRight: {
+      ...flex.flexRow,
+      ...flex.itemsCenter,
+      ...gap.g12,
+    },
+    darkModeContainer: {
+      ...flex.flexRow,
+      ...flex.itemsCenter,
+      ...gap.g8,
+    },
+    darkModeIcon: {
+      ...margin.mr4,
     },
     logoutButton: {
       ...padding.p8,
