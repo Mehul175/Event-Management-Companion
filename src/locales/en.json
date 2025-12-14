@@ -1,0 +1,65 @@
+{
+  "common": {
+    "appName": "EventCompanion",
+    "ok": "OK",
+    "cancel": "Cancel",
+    "retry": "Retry",
+    "errorFallback": "Something went wrong",
+    "searchPlaceholder": "Search",
+    "pullToRefresh": "Pull to refresh",
+    "noResults": "No results found"
+  },
+  "auth": {
+    "title": "Welcome",
+    "subtitle": "Manage events and check-ins",
+    "email": "Email",
+    "password": "Password",
+    "login": "Login",
+    "logout": "Logout",
+    "logoutConfirm": "Are you sure you want to logout?",
+    "forgotPassword": "Forgot password?",
+    "errors": {
+      "emailRequired": "Email is required",
+      "emailInvalid": "Enter a valid email",
+      "passwordRequired": "Password is required",
+      "passwordMin": "Password must be at least {{min}} characters",
+      "loginFailed": "Invalid credentials. Please try again."
+    },
+    "success": {
+      "login": "Login successful",
+      "logout": "Logged out"
+    }
+  },
+  "events": {
+    "title": "Events",
+    "empty": "No events yet",
+    "error": "Unable to load events",
+    "lastUpdated": "Last updated",
+    "details": {
+      "attendeeCount": "Attendees: {{count}}",
+      "location": "Location",
+      "startsAt": "Starts at",
+      "endsAt": "Ends at",
+      "checkInCta": "Go to check-ins"
+    }
+  },
+  "attendees": {
+    "title": "Attendees",
+    "searchPlaceholder": "Search attendees",
+    "empty": "No attendees found",
+    "error": "Unable to load attendees",
+    "checkIn": "Check-in",
+    "checkedIn": "Checked-in",
+    "pendingSync": "Pending sync",
+    "synced": "Synced"
+  },
+  "offline": {
+    "status": "You are offline",
+    "syncing": "Syncing pending check-ins...",
+    "synced": "All check-ins synced"
+  },
+  "notifications": {
+    "eventStarting": "Event starting soon",
+    "syncComplete": "Pending check-ins synced"
+  }
+}

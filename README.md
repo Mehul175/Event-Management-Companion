@@ -1,97 +1,61 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+## EventCompanion
 
-# Getting Started
+Offline-first React Native (CLI) app for event management with authentication, event browsing, attendee check-ins, and sync queueing.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
-
-## Step 1: Start Metro
-
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
-
-To start the Metro dev server, run the following command from the root of your React Native project:
-
-```sh
-# Using npm
-npm start
-
-# OR using Yarn
-yarn start
+### Setup
+1) Install dependencies
+```bash
+npm install
 ```
-
-## Step 2: Build and run your app
-
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
-
-```sh
-# Using npm
+2) iOS pods (first time)
+```bash
+cd ios && pod install && cd ..
+```
+3) Run app
+```bash
 npm run android
-
-# OR using Yarn
-yarn android
-```
-
-### iOS
-
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
-```
-
-Then, and every time you update your native dependencies, run:
-
-```sh
-bundle exec pod install
-```
-
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
-
-```sh
-# Using npm
+# or
 npm run ios
-
-# OR using Yarn
-yarn ios
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+### Mock backend (json-server)
+```bash
+cd mock-server
+npx json-server --watch db.json --port 3000
+```
+The app consumes data only via Axios services; it never imports JSON directly.
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+### Architecture
+- **State**: Redux Toolkit + redux-persist (auth, events, attendees, network)
+- **API**: Single Axios instance with token/error interceptors
+- **Navigation**: React Navigation stack (auth flow, main flow)
+- **UI**: EText/ESafeAreaWrapper/ETextInput/ESearchInput, FlashList, Skeleton
+- **Styling**: react-native-size-matters (no hardcoded spacing/fonts), shared spacing utilities
+- **Offline**: NetInfo, cached slices, pending check-in queue with auto-sync
+- **Notifications (mock)**: Toast-based event start + sync complete
 
-## Step 3: Modify your app
+### Offline strategy
+- Cache events/attendees in persisted Redux state.
+- NetInfo-driven network slice.
+- Check-ins queue locally when offline; auto-sync on reconnect via `syncService`.
+- Toast feedback for offline check-ins and sync completion.
 
-Now that you have successfully run the app, let's make changes!
+### Folder map (key)
+- `src/api`: axios instance, interceptors, endpoints, types
+- `src/services`: auth/event/attendee services, sync + notification services
+- `src/features`: RTK slices for auth/events/attendees
+- `src/navigation`: stack navigator + types
+- `src/components/common`: shared UI (EText, ESafeAreaWrapper, ETextInput, ESearchInput, Skeleton, Toast)
+- `src/styles` / `src/typography` / `src/theme`: spacing, typography, theming
+- `src/screens`: auth, events, attendees
+- `mock-server/db.json`: mock data
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+### Trade-offs
+- Uses in-app toasts for mock notifications instead of platform push.
+- Simple theme toggle hook (light by default); dark palette defined.
+- Login against json-server via user query (no JWT refresh).
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+### Future improvements
+- Add push notifications integration.
+- Expand offline conflict resolution (e.g., last-write wins prompts).
+- Add unit/e2e coverage for slices and screens.
