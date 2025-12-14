@@ -15,16 +15,6 @@ export type User = {
   role: UserRole;
 };
 
-export type Event = {
-  id: number;
-  title: string;
-  description: string;
-  location: string;
-  startTime: string;
-  endTime: string;
-  organizerId: number;
-};
-
 export type Attendee = {
   id: number;
   eventId: number;

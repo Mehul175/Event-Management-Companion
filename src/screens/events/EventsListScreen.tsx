@@ -4,7 +4,7 @@
  * Responsibility: Provide optimized event list with FlashList and pull-to-refresh.
  */
 
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -12,9 +12,9 @@ import { ms } from 'react-native-size-matters';
 import Toast from 'react-native-toast-message';
 import { useNavigation } from '@react-navigation/native';
 import EventCard from '../../components/event/EventCard';
+import EventSkeletonCard from '../../components/event/EventSkeletonCard';
 import ESafeAreaWrapper from '../../components/common/ESafeAreaWrapper';
 import EText from '../../components/common/EText';
-import Skeleton from '../../components/common/Skeleton';
 import { flex, gap, margin, padding } from '../../styles';
 import { fetchEvents } from '../../features/events/eventSlice';
 import { useAppDispatch, useAppSelector } from '../../hooks/useRedux';
@@ -36,7 +36,36 @@ const EventsListScreen: React.FC = () => {
   const { logout } = useAuth();
 
   const { events, loading, error } = useAppSelector((state) => state.events);
+  const [localLoading, setLocalLoading] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const styles = useMemo(() => createStyles(theme), [theme]);
+
+  // Manage local loading state with minimum 3 second display
+  useEffect(() => {
+    if (loading) {
+      // When Redux loading starts, immediately show skeleton
+      setLocalLoading(true);
+      // Clear any existing timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    } else {
+      // When Redux loading ends, wait 3 seconds before hiding skeleton
+      timeoutRef.current = setTimeout(() => {
+        setLocalLoading(false);
+        timeoutRef.current = null;
+      }, 3000);
+    }
+
+    // Cleanup timeout on unmount
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, [loading]);
 
   useEffect(() => {
     dispatch(fetchEvents());
@@ -93,23 +122,37 @@ const EventsListScreen: React.FC = () => {
     [handleEventPress],
   );
 
-  const keyExtractor = useCallback((item: any) => `${item.id}`, []);
+  const renderSkeletonItem = useCallback(
+    ({ index }: { item: Event | null; index: number }) => <EventSkeletonCard index={index} />,
+    [],
+  );
+
+  const renderItemWithSkeleton = useCallback(
+    ({ item, index }: { item: Event | null; index: number }) => {
+      if (localLoading && events.length > 0 && item === null) {
+        return renderSkeletonItem({ item, index });
+      }
+      if (item) {
+        return renderItem({ item });
+      }
+      return null;
+    },
+    [localLoading, events.length, renderSkeletonItem, renderItem],
+  );
+
+  const keyExtractor = useCallback((item: Event | null, index: number): string => {
+    if (item === null) {
+      return `skeleton-${index}`;
+    }
+    return `${item.id}`;
+  }, []);
 
   const ListEmptyComponent = useCallback(() => {
-    if (loading) {
+    if (localLoading) {
       return (
         <View style={styles.skeletonContainer}>
           {[0, 1, 2].map((key) => (
-            <Skeleton
-              key={key}
-              isLoading
-              containerStyle={styles.skeleton}
-              layout={[
-                { key: `title-${key}`, width: '70%', height: 20, marginBottom: 8 },
-                { key: `desc-${key}`, width: '90%', height: 16, marginBottom: 6 },
-                { key: `meta-${key}`, width: '60%', height: 14 },
-              ]}
-            />
+            <EventSkeletonCard key={key} index={key} />
           ))}
         </View>
       );
@@ -121,7 +164,10 @@ const EventsListScreen: React.FC = () => {
         </EText>
       </View>
     );
-  }, [loading, styles.emptyState, styles.skeleton, styles.skeletonContainer, theme.typography.textInputSecondary]);
+  }, [localLoading, styles.emptyState, styles.skeletonContainer, theme.typography.textInputSecondary]);
+
+  // Show skeleton items when refreshing (localLoading and events exist)
+  const displayData: (Event | null)[] = localLoading && events.length > 0 ? Array(3).fill(null) : events;
 
   return (
     <ESafeAreaWrapper>
@@ -138,14 +184,15 @@ const EventsListScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
         <FlashList
-          data={events}
-          renderItem={renderItem}
+          data={displayData}
+          renderItem={renderItemWithSkeleton}
           keyExtractor={keyExtractor}
           estimatedItemSize={ESTIMATED_ITEM_SIZE}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={onRefresh} />}
           ListEmptyComponent={ListEmptyComponent}
           ItemSeparatorComponent={ItemSeparator}
           contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
         />
       </View>
     </ESafeAreaWrapper>
@@ -181,11 +228,6 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     },
     skeletonContainer: {
       ...gap.g12,
-    },
-    skeleton: {
-      ...padding.p16,
-      backgroundColor: theme.colors.card,
-      borderRadius: ms(12),
     },
   });
 

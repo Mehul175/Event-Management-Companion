@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import SkeletonLib, { SkeletonProps as LibSkeletonProps } from 'react-native-reanimated-skeleton';
+import SkeletonLib, { ISkeletonProps as LibSkeletonProps } from 'react-native-reanimated-skeleton';
 import { useTheme } from '../../theme/ThemeContext';
 
 export type SkeletonProps = LibSkeletonProps;
